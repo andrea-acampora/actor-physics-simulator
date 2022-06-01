@@ -21,6 +21,7 @@ public class MainActor extends AbstractBehavior<MsgProtocol> {
         modelActor = context.spawn(ModelActor.create(), "modelActor");
         viewActor = context.spawn(ViewActor.create(), "viewActor");
         controllerActor = context.spawn(ControllerActor.create(modelActor, viewActor), "controllerActor");
+        controllerActor.tell(new ControllerActor.StartMsg());
 
     }
 

@@ -20,12 +20,15 @@ public class SimulationState {
     /* virtual time step */
     double dt;
 
-    long steps;
+    long currentStep;
 
-    public SimulationState(final int nBodies) {
+    long stepToDo;
+
+    public SimulationState(final int nBodies, final long stepToDo) {
         this.vt = 0;
         this.dt = 0.001;
-        this.steps = 0;
+        this.currentStep = 0;
+        this.stepToDo = stepToDo;
 
         this.bounds = new Boundary(-6.0, -6.0, 6.0, 6.0);
         Random rand = new Random(System.currentTimeMillis());
@@ -59,10 +62,14 @@ public class SimulationState {
     }
 
     public long getSteps() {
-        return steps;
+        return currentStep;
     }
 
     public void incrementSteps() {
-        this.steps++;
+        this.currentStep++;
+    }
+
+    public long getStepToDo() {
+        return stepToDo;
     }
 }
