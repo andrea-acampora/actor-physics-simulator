@@ -6,6 +6,9 @@ import akka.actor.typed.javadsl.AbstractBehavior;
 import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
+import pcd03.controller.ControllerActor;
+import pcd03.model.ModelActor;
+import pcd03.view.ViewActor;
 
 public class MainActor extends AbstractBehavior<Void> {
 
@@ -16,8 +19,9 @@ public class MainActor extends AbstractBehavior<Void> {
     private MainActor(ActorContext<Void> context) {
         super(context);
         modelActor = context.spawn(ModelActor.create(), "modelActor");
-        controllerActor = context.spawn(ControllerActor.create(), "controllerActor");
         viewActor = context.spawn(ViewActor.create(), "viewActor");
+        controllerActor = context.spawn(ControllerActor.create(modelActor, viewActor), "controllerActor");
+
     }
 
     public static Behavior<Void> create() {
