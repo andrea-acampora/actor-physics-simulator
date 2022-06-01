@@ -6,6 +6,6 @@ import akka.actor.typed.ActorSystem;
 public class Main {
 
     public static void main(String[] args) {
-        final ActorSystem<Void> system = ActorSystem.create(MainActor.create(), "mainActor");
+        final ActorSystem<MsgProtocol> system = ActorSystem.create(MainActor.create(), "mainActor");
     }
 }

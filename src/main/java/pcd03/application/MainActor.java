@@ -10,13 +10,13 @@ import pcd03.controller.ControllerActor;
 import pcd03.model.ModelActor;
 import pcd03.view.ViewActor;
 
-public class MainActor extends AbstractBehavior<Void> {
+public class MainActor extends AbstractBehavior<MsgProtocol> {
 
-    private final ActorRef<Void> modelActor;
-    private final ActorRef<Void> controllerActor;
-    private final ActorRef<Void> viewActor;
+    private final ActorRef<MsgProtocol> modelActor;
+    private final ActorRef<MsgProtocol> controllerActor;
+    private final ActorRef<MsgProtocol> viewActor;
 
-    private MainActor(ActorContext<Void> context) {
+    private MainActor(ActorContext<MsgProtocol> context) {
         super(context);
         modelActor = context.spawn(ModelActor.create(), "modelActor");
         viewActor = context.spawn(ViewActor.create(), "viewActor");
@@ -24,12 +24,12 @@ public class MainActor extends AbstractBehavior<Void> {
 
     }
 
-    public static Behavior<Void> create() {
+    public static Behavior<MsgProtocol> create() {
         return Behaviors.setup(MainActor::new);
     }
 
     @Override
-    public Receive<Void> createReceive() {
+    public Receive<MsgProtocol> createReceive() {
         return null;
     }
 }
