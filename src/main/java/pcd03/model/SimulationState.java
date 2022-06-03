@@ -72,4 +72,6 @@ public class SimulationState {
     public long getStepToDo() {
         return stepToDo;
     }
+
+    public long getCurrentStep() { return currentStep;}
 }

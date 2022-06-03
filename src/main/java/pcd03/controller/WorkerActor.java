@@ -18,10 +18,6 @@ public class WorkerActor extends AbstractBehavior<MsgProtocol> {
         return Behaviors.setup(WorkerActor::new);
     }
 
-//    private Behavior<MsgProtocol> onStartMsg(MsgProtocol msg ){
-//        return this;
-//    }
-
     @Override
     public Receive<MsgProtocol> createReceive() {
         return newReceiveBuilder()
@@ -30,15 +26,29 @@ public class WorkerActor extends AbstractBehavior<MsgProtocol> {
                 .build();
     }
 
-    private Behavior<MsgProtocol> onUpdatePositionMsg(M msg) {
-        return this;
-    }
-
     private Behavior<MsgProtocol> onComputeForcesMsg(ComputeForcesMsg msg) {
+        getContext().getLog().info("WorkerActor computing forces!");
+        msg.sender.tell(new MasterActor.ComputeForcesTaskDoneMsg());
         return this;
     }
 
 
-    public static class ComputeForcesMsg implements MsgProtocol{}
-    public static class UpdatePositionMsg implements MsgProtocol{}
+    private Behavior<MsgProtocol> onUpdatePositionMsg(UpdatePositionMsg msg) {
+        getContext().getLog().info("WorkerActor updating positions!");
+        msg.sender.tell(new MasterActor.UpdatePositionTaskDoneMsg());
+        return this;
+    }
+
+    public static class ComputeForcesMsg implements MsgProtocol{
+        public ActorRef<MsgProtocol> sender;
+        public ComputeForcesMsg(ActorRef<MsgProtocol> sender) {
+            this.sender = sender;
+        }
+    }
+    public static class UpdatePositionMsg implements MsgProtocol{
+        public ActorRef<MsgProtocol> sender;
+        public UpdatePositionMsg(ActorRef<MsgProtocol> sender) {
+            this.sender = sender;
+        }
+    }
 }
