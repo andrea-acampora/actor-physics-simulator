@@ -6,9 +6,15 @@
  * User Manual available at https://docs.gradle.org/7.2/userguide/building_java_projects.html
  */
 
+
+
 plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     application
+}
+
+application {
+    mainClass.set("pcd03.application.Main")
 }
 
 repositories {

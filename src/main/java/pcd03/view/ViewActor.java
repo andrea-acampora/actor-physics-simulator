@@ -71,7 +71,6 @@ public class ViewActor extends AbstractBehavior<MsgProtocol> {
         }
 
         private Behavior<MsgProtocol> onUpdateViewMsg(UpdateViewMsg msg ) {
-            this.getContext().getLog().info("Updating view");
             this.gui.display(msg.state);
             return this;
         }

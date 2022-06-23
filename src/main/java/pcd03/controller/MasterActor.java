@@ -21,10 +21,12 @@ public class MasterActor extends AbstractBehavior<MsgProtocol> {
     private final int nWorkers;
     private List<ActorRef<MsgProtocol>> workerActors;
     Chrono time = new Chrono();
-    private SimulationState simulationState;
     private long nComputeForcesTaskDone;
     private long nUpdatePositionTaskDone;
-
+    private int bodiesListSize;
+    private int offset;
+    private boolean stopFlag;
+    private MasterState masterState;
 
     public MasterActor(ActorContext<MsgProtocol> context, ActorRef<MsgProtocol> modelActor, ActorRef<MsgProtocol> viewActor) {
         super(context);
@@ -32,6 +34,13 @@ public class MasterActor extends AbstractBehavior<MsgProtocol> {
         this.viewActor = viewActor;
         this.nWorkers = Runtime.getRuntime().availableProcessors() + 1;
         this.workerActors = new LinkedList<>();
+    }
+
+    public enum MasterState {
+        STARTING,
+        RUNNING,
+        STOPPED,
+        UPDATING_VIEW;
     }
 
     public static Behavior<MsgProtocol> create(ActorRef<MsgProtocol> modelActor, ActorRef<MsgProtocol> viewActor) {
@@ -54,32 +63,46 @@ public class MasterActor extends AbstractBehavior<MsgProtocol> {
                 .build();
     }
 
-
     private Behavior<MsgProtocol> onStartSimulationMsg(StartSimulationMsg msg) {
+        this.masterState = MasterState.STARTING;
         this.time.start();
         for(int i = 0; i < this.nWorkers; i++){
-            this.workerActors.add(getContext().spawn(WorkerActor.create(), "workerActor" + i));
+            this.workerActors.add(getContext().spawn(WorkerActor.create(modelActor), "workerActor" + i));
         }
         this.modelActor.tell(new ModelActor.GetSimulationStateMsg(this.getContext().getSelf()));
         return this;
     }
 
-    //creare handler per task fatto da ciascun worker che incrementa un contatore, in modo che il master si accorge quando tutti i worker hanno terminato
-    //a questo punto può fare il secondo task
-    //quando il secondo task finisce si manda un messaggio a se stesso per dire di fare il prossimo step e manda il messaggio alla view per aggiornare
-    //mando messaggio al worker passandogli tutti i body e un range che deve computare
     private Behavior<MsgProtocol> onSimulationStateValueMsg(ModelActor.SimulationStateValueMsg msg) {
-        this.simulationState = msg.state;
-        getContext().getSelf().tell(new DoSimulationStepMsg());
+        switch(masterState){
+            case STARTING:
+                this.bodiesListSize = msg.state.getBodies().size();
+                this.offset = bodiesListSize / nWorkers;
+                getContext().getSelf().tell(new DoSimulationStepMsg(msg.state));
+                masterState = MasterState.RUNNING;
+                break;
+            case RUNNING:
+                this.getContext().getSelf().tell(new DoUpdatePositionTaskMsg(msg.state));
+                break;
+            case UPDATING_VIEW:
+                this.viewActor.tell(new ViewActor.UpdateViewMsg(msg.state));
+                this.getContext().getSelf().tell(new DoSimulationStepMsg(msg.state));
+                masterState = MasterState.RUNNING;
+                break;
+            case STOPPED:
+                getContext().getSelf().tell(new DoSimulationStepMsg(msg.state));
+                masterState = MasterState.RUNNING;
+        }
         return this;
     }
 
-    private Behavior<MsgProtocol> onDoSimulationStepMsg(DoSimulationStepMsg msg) {
-        getContext().getLog().info("MasterActor computing a simulation step!");
-        if (this.simulationState.getCurrentStep() < this.simulationState.getStepToDo()) {
-        //CONTROLLARE SE È STOPPATA
-            getContext().getSelf().tell(new DoComputeForcesTaskMsg());
 
+    private Behavior<MsgProtocol> onDoSimulationStepMsg(DoSimulationStepMsg msg) {
+        if (msg.simulationState.getCurrentStep() < msg.simulationState.getStepToDo()) {
+        //CONTROLLARE SE È STOPPATA
+            if(!this.stopFlag){
+                getContext().getSelf().tell(new DoComputeForcesTaskMsg(msg.simulationState));
+            }
         } else {
             time.stop();
             getContext().getLog().info("Time elapsed: " + time.getTime() + " ms.");
@@ -89,7 +112,12 @@ public class MasterActor extends AbstractBehavior<MsgProtocol> {
     }
 
     private Behavior<MsgProtocol> onDoComputeForcesTaskMsg(DoComputeForcesTaskMsg msg) {
-        this.workerActors.forEach(workerActor -> workerActor.tell(new WorkerActor.ComputeForcesMsg(this.getContext().getSelf())));
+        int start = 0;
+        for (int i = 0; i < nWorkers - 1; i++){
+            workerActors.get(i).tell(new WorkerActor.ComputeForcesMsg(this.getContext().getSelf(), msg.simulationState, start, start + offset));
+            start = start + offset;
+        }
+        workerActors.get(this.workerActors.size() - 1).tell(new WorkerActor.ComputeForcesMsg(this.getContext().getSelf(), msg.simulationState, start, bodiesListSize));
         return this;
     }
 
@@ -97,17 +125,23 @@ public class MasterActor extends AbstractBehavior<MsgProtocol> {
         this.nComputeForcesTaskDone++;
         if (this.nComputeForcesTaskDone == this.workerActors.size()){
             this.nComputeForcesTaskDone = 0;
-            this.getContext().getSelf().tell(new DoUpdatePositionTaskMsg());
+            this.modelActor.tell(new ModelActor.GetSimulationStateMsg(this.getContext().getSelf()));
         }
         return this;
     }
 
     private Behavior<MsgProtocol> onDoUpdatePositionTaskMsg(DoUpdatePositionTaskMsg msg) {
-        this.workerActors.forEach(workerActor -> workerActor.tell(new WorkerActor.UpdatePositionMsg(this.getContext().getSelf())));
+        int start = 0;
+        for (int i = 0; i < nWorkers - 1; i++){
+            workerActors.get(i).tell(new WorkerActor.UpdatePositionMsg(this.getContext().getSelf(), msg.simulationState, start, start + offset));
+            start = start + offset;
+        }
+        workerActors.get(this.workerActors.size() - 1).tell(new WorkerActor.UpdatePositionMsg(this.getContext().getSelf(), msg.simulationState, start, bodiesListSize));
         return this;
     }
 
     private Behavior<MsgProtocol> onUpdatePositionTaskDoneMsg(UpdatePositionTaskDoneMsg msg) {
+
         this.nUpdatePositionTaskDone++;
         if (this.nUpdatePositionTaskDone == this.workerActors.size()){
             this.nUpdatePositionTaskDone = 0;
@@ -117,37 +151,48 @@ public class MasterActor extends AbstractBehavior<MsgProtocol> {
     }
 
     private Behavior<MsgProtocol> onSimulationStepDoneMsg(SimulationStepDoneMsg msg) {
-        this.simulationState.setVt(simulationState.getVt() + simulationState.getDt());
-        this.simulationState.incrementSteps();
-        this.viewActor.tell(new ViewActor.UpdateViewMsg(this.simulationState));
-        this.getContext().getSelf().tell(new DoSimulationStepMsg());
+
+        masterState = MasterState.UPDATING_VIEW;
+        modelActor.tell(new ModelActor.SimulationStepDoneMsg(getContext().getSelf()));
         return this;
     }
 
     private Behavior<MsgProtocol> onStopSimulationMsg(StopSimulationMsg msg) {
         getContext().getLog().info("MasterActor stopped");
+        this.stopFlag = true;
+        masterState = MasterState.STOPPED;
         return this;
     }
 
     private Behavior<MsgProtocol> onResumeSimulationMsg(ResumeSimulationMsg msg) {
         getContext().getLog().info("MasterActor resumed");
+        this.stopFlag = false;
+        this.modelActor.tell(new ModelActor.GetSimulationStateMsg(this.getContext().getSelf()));
         return this;
     }
 
     public static class StartSimulationMsg implements MsgProtocol{}
     public static class StopSimulationMsg implements MsgProtocol{}
     public static class ResumeSimulationMsg implements MsgProtocol{}
-    public static class DoSimulationStepMsg implements MsgProtocol{}
+    public static class DoSimulationStepMsg implements MsgProtocol{
+        SimulationState simulationState;
+        public DoSimulationStepMsg(SimulationState simulationState) {
+            this.simulationState = simulationState;
+        }
+    }
     public static class SimulationStepDoneMsg implements MsgProtocol{}
-
-    public static class DoComputeForcesTaskMsg implements MsgProtocol { }
-
-    public static class DoUpdatePositionTaskMsg implements MsgProtocol {}
-
+    public static class DoComputeForcesTaskMsg implements MsgProtocol {
+        SimulationState simulationState;
+        public DoComputeForcesTaskMsg(SimulationState simulationState) {
+            this.simulationState = simulationState;
+        }
+    }
+    public static class DoUpdatePositionTaskMsg implements MsgProtocol {
+        SimulationState simulationState;
+        public DoUpdatePositionTaskMsg(SimulationState simulationState) {
+            this.simulationState = simulationState;
+        }
+    }
     public static class ComputeForcesTaskDoneMsg implements MsgProtocol{}
     public static class UpdatePositionTaskDoneMsg implements MsgProtocol{}
-
-
-
-
 }
