@@ -44,7 +44,7 @@ public class SimulationGUI {
 
 			this.stopButton.setEnabled(false);
 
-			setTitle("Concurrent Bodies Simulator");
+			setTitle("Actor Bodies Simulator");
 			setSize(w,h);
 			setResizable(false);
 
@@ -71,6 +71,7 @@ public class SimulationGUI {
 			});
 			setContentPane(cp);
 		}
+
 
 		public void display(ArrayList<Body> bodies, double vt, long iter, Boundary bounds){
 			try {

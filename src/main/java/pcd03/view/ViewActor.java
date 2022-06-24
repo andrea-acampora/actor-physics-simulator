@@ -2,10 +2,7 @@ package pcd03.view;
 
 import akka.actor.typed.ActorRef;
 import akka.actor.typed.Behavior;
-import akka.actor.typed.javadsl.AbstractBehavior;
-import akka.actor.typed.javadsl.ActorContext;
-import akka.actor.typed.javadsl.Behaviors;
-import akka.actor.typed.javadsl.Receive;
+import akka.actor.typed.javadsl.*;
 import pcd03.application.MsgProtocol;
 import pcd03.controller.ControllerActor;
 import pcd03.model.SimulationState;
@@ -15,15 +12,20 @@ public class ViewActor extends AbstractBehavior<MsgProtocol> {
 
     private final ActorRef<MsgProtocol> controllerActor;
     private final SimulationGUI gui;
+    private final StashBuffer<MsgProtocol> stashBuffer;
 
-    public ViewActor(ActorContext<MsgProtocol> context, ActorRef<MsgProtocol> controllerActor) {
+
+
+    public ViewActor(ActorContext<MsgProtocol> context, ActorRef<MsgProtocol> controllerActor, StashBuffer<MsgProtocol> stash) {
         super(context);
         this.controllerActor = controllerActor;
         this.gui = new SimulationGUI(getContext().getSelf());
+        this.stashBuffer = stash;
     }
 
     public static Behavior<MsgProtocol> create(ActorRef<MsgProtocol> controllerActor) {
-        return Behaviors.setup(context -> new ViewActor(context, controllerActor));
+        return Behaviors.withStash(100,
+                stash -> Behaviors.setup(context -> new ViewActor(context, controllerActor, stash)));
     }
 
     @Override
@@ -34,7 +36,6 @@ public class ViewActor extends AbstractBehavior<MsgProtocol> {
     }
 
     private Behavior<MsgProtocol> onDisplayViewMsg(DisplayViewMsg msg ) {
-        this.getContext().getLog().info("Created view");
         this.gui.start();
         return Behaviors.setup(context -> new WaitingBehaviour(context, this.controllerActor, this.gui));
     }
@@ -76,7 +77,6 @@ public class ViewActor extends AbstractBehavior<MsgProtocol> {
         }
 
         private Behavior<MsgProtocol> onStopButtonPressedMsg(StopButtonPressedMsg msg ) {
-            this.getContext().getLog().info("Stop button pressed");
             this.controllerActor.tell(new ControllerActor.StopMsg());
             return Behaviors.setup(context -> new WaitingBehaviour(context, this.controllerActor, this.gui));
         }
@@ -97,13 +97,19 @@ public class ViewActor extends AbstractBehavior<MsgProtocol> {
         public Receive<MsgProtocol> createReceive() {
             return newReceiveBuilder()
                     .onMessage(StartButtonPressedMsg.class, this::onStartButtonPressedMsg)
+                    .onMessage(MsgProtocol.class, this::onAnyMessage)
                     .build();
         }
 
+        private Behavior<MsgProtocol> onAnyMessage(MsgProtocol msg) {
+            stashBuffer.stash(msg);
+            return this;
+        }
+
         private Behavior<MsgProtocol> onStartButtonPressedMsg(StartButtonPressedMsg msg ) {
-            this.getContext().getLog().info("Start button pressed");
             this.controllerActor.tell(new ControllerActor.StartMsg(getContext().getSelf()));
-            return Behaviors.setup(context -> new RunningBehaviour(context, controllerActor, gui));
+            return stashBuffer.unstashAll(
+                    Behaviors.setup(context -> new RunningBehaviour(context, controllerActor, gui)));
         }
     }
 

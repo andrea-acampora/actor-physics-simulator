@@ -8,6 +8,7 @@ import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.javadsl.Receive;
 import pcd03.application.MsgProtocol;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ModelActor extends AbstractBehavior<MsgProtocol> {
@@ -16,7 +17,7 @@ public class ModelActor extends AbstractBehavior<MsgProtocol> {
 
     public ModelActor(ActorContext<MsgProtocol> context) {
         super(context);
-        this.simulationState = new SimulationState(1000, 1000);
+        this.simulationState = new SimulationState(1000, 10000);
     }
 
     public static Behavior<MsgProtocol> create() {
@@ -34,7 +35,7 @@ public class ModelActor extends AbstractBehavior<MsgProtocol> {
 
     private Behavior<MsgProtocol> onBodiesListUpdatedMsg(BodiesSubListUpdatedMsg msg) {
         int k = 0;
-        for(int i = msg.start; i < msg.end; i++){
+        for(int i = msg.start; i < msg.end; i++) {
             simulationState.getBodies().set(i, msg.subList.get(k++));
         }
         return this;
@@ -48,7 +49,10 @@ public class ModelActor extends AbstractBehavior<MsgProtocol> {
     }
 
     private Behavior<MsgProtocol> onGetSimulationStateMsg(GetSimulationStateMsg msg) {
-        msg.replyTo.tell(new SimulationStateValueMsg(this.simulationState));
+        ArrayList<Body> defCopy = new ArrayList<>();
+        this.simulationState.getBodies().forEach(b -> defCopy.add(new Body(b.getId(), new P2d(b.getPos().getX(), b.getPos().getY()), new V2d(b.getVel().x, b.getVel().y), b.getMass())));
+        SimulationState defState = new SimulationState(defCopy,this.simulationState.getBounds(),this.simulationState.getVt(), this.simulationState.getDt(), this.simulationState.getCurrentStep(), this.simulationState.getStepToDo());
+        msg.replyTo.tell(new SimulationStateValueMsg(defState));
         return this;
     }
 
@@ -84,5 +88,4 @@ public class ModelActor extends AbstractBehavior<MsgProtocol> {
             this.end = end;
         }
     }
-
 }

@@ -24,6 +24,15 @@ public class SimulationState {
 
     long stepToDo;
 
+    public SimulationState(ArrayList<Body> bodies, Boundary bounds, double vt, double dt, long currentStep, long stepToDo) {
+        this.bodies = bodies;
+        this.bounds = bounds;
+        this.vt = vt;
+        this.dt = dt;
+        this.currentStep = currentStep;
+        this.stepToDo = stepToDo;
+    }
+
     public SimulationState(final int nBodies, final long stepToDo) {
         this.vt = 0;
         this.dt = 0.001;
