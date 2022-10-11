@@ -200,7 +200,7 @@ public class MasterActor extends AbstractBehavior<MsgProtocol> {
         }
 
         private Behavior<MsgProtocol> onSimulationStateValueMsg(ModelActor.SimulationStateValueMsg msg) {
-                //viewActor.tell(new ViewActor.UpdateViewMsg(msg.state));
+                viewActor.tell(new ViewActor.UpdateViewMsg(msg.state));
                 this.getContext().getSelf().tell(new DoSimulationStepMsg(msg.state));
                 return Behaviors.setup(RunningBehaviour::new);
         }
